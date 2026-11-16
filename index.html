@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f3eee6" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#1f211d" media="(prefers-color-scheme: dark)" />
+    <title>Emily's Timer</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- iPhone "Add to Home Screen": icon, name, full-screen launch. -->
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="Emily's Timer" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  </head>
+  <body data-state="idle">
+    <main id="app">
+      <h1>Emily's Timer</h1>
+
+      <section id="display" aria-live="polite">
+        <div id="dial">
+          <svg viewBox="0 0 100 100" aria-hidden="true">
+            <circle class="track" cx="50" cy="50" r="46" />
+            <circle id="ring" class="ring" cx="50" cy="50" r="46" pathLength="1" />
+          </svg>
+          <div id="readout">
+            <p id="phase">Ready</p>
+            <p id="clock">00:00</p>
+            <p id="progress"></p>
+          </div>
+        </div>
+      </section>
+
+      <div id="controls">
+        <button id="start" class="primary">Start</button>
+        <button id="reset" class="quiet" disabled>Reset</button>
+      </div>
+
+      <form id="setup">
+        <label><span>Sets</span> <input name="sets" type="number" inputmode="numeric" min="1" max="99" value="10" required /></label>
+        <label><span>Work <span class="unit">sec</span></span> <input name="work" type="number" inputmode="numeric" min="1" max="3600" value="60" required /></label>
+        <label><span>Rest <span class="unit">sec</span></span> <input name="rest" type="number" inputmode="numeric" min="0" max="3600" value="30" required /></label>
+        <div class="tone-row">
+          <label>Tone
+            <select name="tone" id="tone"></select>
+          </label>
+          <button type="button" id="preview-tone" class="quiet" aria-label="Preview tone">Listen</button>
+        </div>
+        <label class="volume-row">
+          <span class="volume-head">Volume <output id="volume-value" for="volume">80%</output></span>
+          <input id="volume" name="volume" type="range" min="0" max="100" step="1" value="80" />
+        </label>
+      </form>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

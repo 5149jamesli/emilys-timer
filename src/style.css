@@ -1,0 +1,303 @@
+/* Spa look: warm sand, sage and clay, soft serif numerals, slow transitions.
+   All colors are tokens on :root; dark mode only redefines the tokens. */
+
+:root {
+  --bg: #f3eee6;          /* warm sand */
+  --bg-glow: #fbf8f3;
+  --surface: #ebe4d8;     /* inputs, quiet buttons */
+  --ink: #4a4540;         /* warm stone text */
+  --ink-soft: #8c8379;
+  --line: #ddd4c6;
+  --sage: #7f9479;        /* rest, primary accent */
+  --clay: #c08a6c;        /* work: warm, not alarming */
+  --on-accent: #fbf8f3;
+  --phase: var(--sage);
+  --tint: transparent;
+
+  --serif: 'Cormorant Garamond', 'Iowan Old Style', Georgia, serif;
+  --sans: 'Jost', system-ui, -apple-system, sans-serif;
+  --slow: 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+  color-scheme: light;
+  font-family: var(--sans);
+  font-weight: 300;
+  color: var(--ink);
+  background: var(--bg);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1f211d;        /* deep moss-charcoal, like a dim treatment room */
+    --bg-glow: #2a2d27;
+    --surface: #2c2f29;
+    --ink: #e9e3d8;
+    --ink-soft: #a39b8f;
+    --line: #3a3d36;
+    --sage: #9db396;
+    --clay: #d4a083;
+    --on-accent: #1f211d;
+    color-scheme: dark;
+  }
+}
+
+body[data-phase='work'] { --phase: var(--clay); --tint: color-mix(in srgb, var(--clay) 14%, transparent); }
+body[data-phase='rest'] { --phase: var(--sage); --tint: color-mix(in srgb, var(--sage) 16%, transparent); }
+
+* { box-sizing: border-box; }
+
+/* Registered so the phase tint fades smoothly instead of snapping. */
+@property --tint {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: transparent;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background:
+    radial-gradient(ellipse at 50% 30%, var(--tint), transparent 70%),
+    radial-gradient(ellipse at 50% 0%, var(--bg-glow), var(--bg) 65%);
+  background-color: var(--bg);
+  transition: --tint 2s ease-in-out;
+}
+
+main {
+  max-width: 26rem;
+  margin: 0 auto;
+  padding: 2rem 1rem 3rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+}
+
+h1 {
+  margin: 0;
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 1.6rem;
+  color: var(--ink-soft);
+  letter-spacing: 0.02em;
+}
+
+/* ---- Dial ---- */
+
+#dial {
+  position: relative;
+  width: min(80vw, 20rem);
+  aspect-ratio: 1;
+}
+
+#dial svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+
+#dial circle { fill: none; stroke-width: 1.6; }
+.track { stroke: var(--line); }
+.ring {
+  stroke: var(--phase);
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  transition: stroke var(--slow);
+}
+
+/* Gentle "breathing" glow behind the dial while the timer runs. */
+#dial::before {
+  content: '';
+  position: absolute;
+  inset: 12%;
+  border-radius: 50%;
+  background: var(--phase);
+  opacity: 0;
+  filter: blur(28px);
+  transition: opacity var(--slow), background var(--slow);
+}
+body[data-state='running'] #dial::before {
+  animation: breathe 8s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.06; transform: scale(0.92); }
+  50% { opacity: 0.16; transform: scale(1.04); }
+}
+
+#readout {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+#readout p { margin: 0; }
+
+#phase {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.35em;
+  color: var(--phase);
+  transition: color var(--slow);
+  padding-left: 0.35em; /* balance the trailing letter-spacing */
+}
+
+#clock {
+  font-family: var(--serif);
+  font-weight: 300;
+  font-size: clamp(4rem, 21vw, 5.5rem);
+  line-height: 1.1;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+#progress {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  letter-spacing: 0.08em;
+  min-height: 1.3em;
+}
+
+/* ---- Buttons ---- */
+
+button {
+  font: inherit;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.4s, opacity 0.4s, transform 0.2s;
+}
+button:active:not(:disabled) { transform: scale(0.97); }
+button:disabled { opacity: 0.35; cursor: default; }
+button:focus-visible, input:focus-visible, select:focus-visible {
+  outline: 2px solid var(--sage);
+  outline-offset: 2px;
+}
+
+#controls { display: flex; gap: 0.75rem; }
+
+.primary {
+  min-width: 9rem;
+  padding: 0.95rem 2rem;
+  font-size: 1rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  background: var(--sage);
+  color: var(--on-accent);
+}
+
+.quiet {
+  padding: 0.95rem 1.5rem;
+  font-size: 0.9rem;
+  letter-spacing: 0.08em;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+/* ---- Setup form ---- */
+
+#setup {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem 0.75rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--line);
+  transition: opacity var(--slow);
+}
+
+/* While a workout is in progress the settings fade back, out of the way. */
+body[data-state='running'] #setup,
+body[data-state='paused'] #setup { opacity: 0.35; }
+
+label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--ink-soft);
+}
+
+.unit { text-transform: none; letter-spacing: 0; opacity: 0.8; }
+
+input, select {
+  width: 100%;
+  font: inherit;
+  font-size: 1.05rem;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid transparent;
+  border-radius: 0.9rem;
+  padding: 0.7rem 0.85rem;
+}
+
+input { text-align: center; font-variant-numeric: tabular-nums; }
+
+.tone-row {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.75rem;
+  align-items: end;
+}
+
+/* ---- Volume slider ---- */
+
+.volume-row { grid-column: 1 / -1; }
+
+.volume-head { display: flex; justify-content: space-between; }
+
+#volume-value {
+  text-transform: none;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+/* A thin sand track that fills with sage up to the thumb (--fill set from JS). */
+input[type='range'] {
+  --fill: 80%;
+  appearance: none;
+  -webkit-appearance: none;
+  height: 2.75rem; /* comfortable touch target; the visible track is thinner */
+  padding: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+input[type='range']::-webkit-slider-runnable-track {
+  height: 0.35rem;
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--sage) var(--fill), var(--surface) var(--fill));
+}
+input[type='range']::-moz-range-track {
+  height: 0.35rem;
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--sage) var(--fill), var(--surface) var(--fill));
+}
+
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin-top: -0.575rem; /* center on the track: (0.35rem - 1.5rem) / 2 */
+  border-radius: 50%;
+  background: var(--bg-glow);
+  border: 2px solid var(--sage);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.12);
+}
+input[type='range']::-moz-range-thumb {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: var(--bg-glow);
+  border: 2px solid var(--sage);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.12);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before { animation: none !important; transition: none !important; }
+}
