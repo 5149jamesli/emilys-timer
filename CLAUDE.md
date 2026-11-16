@@ -45,14 +45,14 @@ Run `npm test` and `npm run typecheck` before calling a change done.
 ## Behavior rules
 
 - **Schedule shape:** each set has one work phase. A rest phase follows every set except the last. When rest is 0, no rest phases are created.
-- **Tones:** one tone plays on Start, one at each phase change, and the same tone plays 3 times when the workout finishes. Repeats are spaced by each tone's `length`.
+- **Tones:** one tone plays on Start, one at each phase change, and the same tone plays 3 times when the workout finishes. Repeats are spaced by each tone's `length`. Tones only play while the **Sound** toggle is on.
 - **Timing is timestamp-based:** elapsed time = time accumulated before the current run + (`performance.now()` - start of current run). The display is computed from that on every animation frame. Never count down by decrementing on a `setInterval`, because that drifts and breaks when a background tab gets throttled.
 - **Volume:** every note goes through one master `GainNode` in `tones.ts`.
   - The slider runs 0–100%, and gain = (slider)², so it feels even. 100% is each tone's designed loudness, and 0 shows "Off".
   - The slider stays usable mid-workout (`syncControls` only locks the number inputs). Letting go of it plays the current tone.
   - The level is saved in `localStorage` (`emilys-timer.volume`), which is a per-device convenience.
   - On iPhone it sits on top of the phone's own volume buttons.
-- **Audio must be unlocked by a user gesture.** `unlockAudio()` is called from the Start click (and Preview). Don't create the `AudioContext` at module load.
+- **Audio must be unlocked by a user gesture.** `unlockAudio()` runs from taps: Start, Listen and switching Sound on. Don't create the `AudioContext` at module load. While sound is off it does nothing, so the app never touches the audio session (or a podcast).
 - **Screen Wake Lock** keeps the screen on while running. It's best effort and failures are ignored.
 
 ## iPhone / PWA
@@ -64,12 +64,12 @@ The main way people use this is on iPhone via Safari → Share → **Add to Home
   - Page loads are network-first, so a new deploy appears the next time the app is opened. Everything else is cache-first.
   - Cache lookups use `ignoreVary: true`. Without it, the cached JS/CSS didn't match offline.
   - If you add a file the app needs offline, check that it ends up in the precache list.
-- **"Play on silent" switch:** iPhone makes web audio choose between two modes, and the user picks with this switch. It's under Volume, on by default, and saved as `emilys-timer.playOnSilent` in `localStorage`. `setPlayOnSilent()` in `tones.ts` sets `navigator.audioSession.type`:
-  - **On → `'playback'`:** tones play even in silent mode, but stop any podcast or music.
-  - **Off → `'transient'`:** tones mix over a podcast, briefly ducking it, but the silent switch mutes them.
-  - It defaults to on because a first test with the phone on silent produced no sound at all. Hearing the timer matters most.
-  - Mixing over a podcast hasn't been tested on a real iPhone yet.
-- **Interruptions:** iPhone can leave the `AudioContext` `suspended` or `interrupted` after calls or app switches. `unlockAudio()` and a `visibilitychange` listener resume it.
+- **Sound toggle:** the user's own design, chosen knowing the trade-off. It's under Volume, saved as `emilys-timer.soundOn` in `localStorage`, and **off by default**. `setSoundOn()` in `tones.ts` controls it.
+  - **Off:** no tones at all, even with the ringer on. Listen and Volume are disabled.
+  - **On:** `navigator.audioSession.type = 'playback'`, so tones play even when the phone is on silent.
+  - **The catch:** on iPhone, `'playback'` pauses a podcast or music.
+  - **Why not mix:** a web app can't both ignore the silent switch and mix with other audio. `'transient'`/`'ambient'` mix but are muted on silent, which we confirmed on a real iPhone: no sound at all. Only a native app (AVAudioSession `.playback` + `.mixWithOthers`/`.duckOthers`) can do both.
+- **Podcast resume (best effort, not yet tested on a phone):** `playTone()` calls `scheduleSleep()`. That suspends the `AudioContext` once the tone has rung out (`length × repeat + RING_OUT_SECONDS`), so iPhone can hand the speaker back and the podcast may resume. The next `playTone()` resumes the context (`await ctx.resume()`, no user gesture needed after the first unlock). The same resume handles iPhone's `interrupted` state after a call. Don't add an automatic resume on `visibilitychange`: it would grab the speaker and pause the podcast again.
 - **Background:** iPhone pauses web apps that aren't on screen, so tones only play while Emily's Timer is the app on screen. Wake Lock keeps the screen on during a workout. A real fix would need a native app.
 
 ## Design direction: calm spa

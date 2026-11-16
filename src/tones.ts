@@ -112,33 +112,28 @@ export function getTone(id: string): Tone {
 }
 
 /**
- * How our sounds share the speaker with other apps on iPhone (Audio Session
- * API; Safari 16.4+, ignored by other browsers). iPhone forces a choice:
- * - 'playback': plays even when the phone is on silent, but stops any podcast
- *   or music that's playing.
- * - 'transient': short alerts that mix over a podcast (ducking it briefly), but
- *   the silent switch mutes them.
- * The user picks with the "Play on silent" switch (setPlayOnSilent).
+ * Sound on/off, set by the "Sound" toggle. Off = no tones at all, whatever the
+ * phone's silent switch says. Off by default.
+ *
+ * When on, iPhone uses the 'playback' audio session (Audio Session API; Safari
+ * 16.4+, ignored by other browsers): tones play even when the phone is on
+ * silent. The catch is that 'playback' pauses a podcast or music. A web app
+ * can't both ignore the silent switch and mix with other audio. To limit that,
+ * the AudioContext is suspended a few seconds after each tone (see
+ * scheduleSleep), which lets iPhone hand the speaker back so the podcast may
+ * resume. That part is best effort and untested on a real phone.
  */
-type AudioSessionType = 'playback' | 'transient';
-let sessionType: AudioSessionType = 'playback';
-
-function applySessionType(): void {
-  const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
-  if (session) session.type = sessionType;
-}
-
-/** true = hear tones even on silent (pauses podcasts); false = mix with podcasts. */
-export function setPlayOnSilent(on: boolean): void {
-  sessionType = on ? 'playback' : 'transient';
-  applySessionType();
-}
+let soundOn = false;
 
 let ctx: AudioContext | null = null;
 /** Every note goes through this node, so it sets the overall volume. */
 let master: GainNode | null = null;
 /** Slider position, 0–1. 1 = the tones' designed loudness. */
 let volume = 0.8;
+/** Pending "release the speaker" timer. */
+let sleepTimer: ReturnType<typeof setTimeout> | undefined;
+/** Extra time after a tone's nominal length for its ring-out (temple bell rings ~6s). */
+const RING_OUT_SECONDS = 3.5;
 
 /**
  * Sliders feel more even when loudness follows a curve rather than a straight
@@ -155,33 +150,60 @@ export function setVolume(v: number): void {
 }
 
 /**
- * Browsers only allow audio after a user gesture, so call this from a click
- * handler (e.g. Start) before the timer needs to make sound.
+ * Turn tones on or off. Call it from the toggle's handler: turning sound on is
+ * a user gesture, which iPhone needs before audio can start.
  */
-export function unlockAudio(): AudioContext {
+export function setSoundOn(on: boolean): void {
+  soundOn = on;
+  if (on) unlockAudio();
+  else scheduleSleep(0);
+}
+
+/**
+ * Browsers only allow audio after a user gesture, so this runs from click
+ * handlers (Start, Listen, the Sound toggle). It does nothing while sound is
+ * off, so the app never touches the audio session (or a podcast) then.
+ */
+export function unlockAudio(): AudioContext | null {
+  if (!soundOn) return null;
   if (!ctx) {
-    applySessionType();
+    const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
+    if (session) session.type = 'playback';
     ctx = new AudioContext();
     master = ctx.createGain();
     master.gain.value = volumeToGain(volume);
     master.connect(ctx.destination);
   }
-  // iPhone can leave the context 'suspended' or 'interrupted' (e.g. after a call
-  // or switching apps); anything but 'running' needs a resume.
+  // Suspended by scheduleSleep, or 'interrupted' by iPhone after a call.
   if (ctx.state !== 'running') void ctx.resume();
   return ctx;
 }
 
-// Coming back to the app after a podcast app, a call or the lock screen.
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && ctx && ctx.state !== 'running') void ctx.resume();
-});
+/** Suspend audio after `seconds` so iPhone can give the speaker back to a podcast. */
+function scheduleSleep(seconds: number): void {
+  clearTimeout(sleepTimer);
+  sleepTimer = setTimeout(() => {
+    if (ctx && ctx.state === 'running') void ctx.suspend();
+  }, seconds * 1000);
+}
 
 /** Play a tone `repeat` times back to back (used for the "workout done" signal). */
-export function playTone(id: string, repeat = 1): void {
+export async function playTone(id: string, repeat = 1): Promise<void> {
+  if (!soundOn) return;
+  clearTimeout(sleepTimer);
   const audio = unlockAudio();
-  const tone = getTone(id);
-  for (let i = 0; i < repeat; i++) {
-    tone.play(audio, audio.currentTime + i * tone.length);
+  if (!audio) return;
+  if (audio.state !== 'running') {
+    try {
+      await audio.resume();
+    } catch {
+      // Nothing more we can do; the next user tap will unlock it again.
+    }
   }
+  const tone = getTone(id);
+  const start = audio.currentTime + 0.02;
+  for (let i = 0; i < repeat; i++) {
+    tone.play(audio, start + i * tone.length);
+  }
+  scheduleSleep(repeat * tone.length + RING_OUT_SECONDS);
 }

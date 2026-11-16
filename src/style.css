@@ -245,7 +245,10 @@ input { text-align: center; font-variant-numeric: tabular-nums; }
 
 /* ---- Volume slider ---- */
 
-.volume-row { grid-column: 1 / -1; }
+.volume-row { grid-column: 1 / -1; transition: opacity 0.4s; }
+/* Dim the volume control while sound is off. */
+.volume-row:has(input:disabled) { opacity: 0.4; }
+input[type='range']:disabled { cursor: default; }
 
 .volume-head { display: flex; justify-content: space-between; }
 
@@ -298,7 +301,7 @@ input[type='range']::-moz-range-thumb {
   box-shadow: 0 1px 4px rgb(0 0 0 / 0.12);
 }
 
-/* ---- "Play on silent" switch ---- */
+/* ---- "Sound" switch ---- */
 
 .switch-row {
   grid-column: 1 / -1;

@@ -6,7 +6,7 @@ import '@fontsource/jost/300.css';
 import '@fontsource/jost/400.css';
 import './style.css';
 import { buildSchedule, formatClock, positionAt, totalDurationMs, type Phase } from './timer';
-import { DEFAULT_TONE_ID, TONES, playTone, setPlayOnSilent, setVolume, unlockAudio } from './tones';
+import { DEFAULT_TONE_ID, TONES, playTone, setSoundOn, setVolume, unlockAudio } from './tones';
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
 
@@ -52,30 +52,33 @@ volumeInput.addEventListener('change', () => {
   if (volumeInput.valueAsNumber > 0) playTone(toneSelect.value);
 });
 
-// "Play on silent" (iPhone): on = hear tones even in silent mode, but they stop
-// podcasts/music; off = tones mix over a podcast but the silent switch mutes
-// them. On by default, because hearing the timer matters most. Remembered per device.
-const silentInput = $<HTMLInputElement>('#play-on-silent');
-const silentHint = $('#silent-hint');
-const SILENT_KEY = 'emilys-timer.playOnSilent';
+// Sound toggle. Off (the default) = no tones, even with the phone's ringer on.
+// On = tones play even when the phone is on silent; on iPhone a playing podcast
+// pauses at each tone and may resume after (see tones.ts). Remembered per device.
+const soundInput = $<HTMLInputElement>('#sound-on');
+const soundHint = $('#sound-hint');
+const previewBtn = $<HTMLButtonElement>('#preview-tone');
+const SOUND_KEY = 'emilys-timer.soundOn';
 
-function applyPlayOnSilent(): void {
-  setPlayOnSilent(silentInput.checked);
-  silentHint.textContent = silentInput.checked
-    ? 'Pauses podcasts & music'
-    : 'Plays over podcasts · muted when on silent';
+function applySound(): void {
+  setSoundOn(soundInput.checked);
+  soundHint.textContent = soundInput.checked
+    ? 'On · plays on silent · pauses podcasts'
+    : "Off · tones won't play";
+  // Nothing to preview or adjust while sound is off.
+  previewBtn.disabled = !soundInput.checked;
+  volumeInput.disabled = !soundInput.checked;
 }
 
 try {
-  const saved = localStorage.getItem(SILENT_KEY);
-  if (saved !== null) silentInput.checked = saved === 'true';
+  soundInput.checked = localStorage.getItem(SOUND_KEY) === 'true';
 } catch {}
-applyPlayOnSilent();
+applySound();
 
-silentInput.addEventListener('change', () => {
-  applyPlayOnSilent();
+soundInput.addEventListener('change', () => {
+  applySound();
   try {
-    localStorage.setItem(SILENT_KEY, String(silentInput.checked));
+    localStorage.setItem(SOUND_KEY, String(soundInput.checked));
   } catch {}
 });
 
