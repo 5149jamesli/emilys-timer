@@ -112,28 +112,29 @@ export function getTone(id: string): Tone {
 }
 
 /**
- * Sound on/off, set by the "Sound" toggle. Off = no tones at all, whatever the
- * phone's silent switch says. Off by default.
- *
- * When on, iPhone uses the 'playback' audio session (Audio Session API; Safari
- * 16.4+, ignored by other browsers): tones play even when the phone is on
- * silent. The catch is that 'playback' pauses a podcast or music. A web app
- * can't both ignore the silent switch and mix with other audio. To limit that,
- * the AudioContext is suspended a few seconds after each tone (see
- * scheduleSleep), which lets iPhone hand the speaker back so the podcast may
- * resume. That part is best effort and untested on a real phone.
+ * Sound mode, chosen with the three-way "Sound" control. iPhone won't let a web
+ * app both ignore the silent switch and mix with a podcast, so the user picks:
+ * - 'off':  no tones at all. The app never touches the audio session.
+ * - 'on':   audio session 'playback'. Plays even on silent, but a playing
+ *           podcast pauses and stays paused (confirmed on a real iPhone).
+ * - 'mix':  audio session 'ambient'. Mixes over a podcast that keeps playing,
+ *           but is muted when the phone is on silent.
+ * The audio session (navigator.audioSession, Safari 16.4+) is ignored by other
+ * browsers, where 'on' and 'mix' sound the same.
  */
-let soundOn = false;
+export type SoundMode = 'off' | 'on' | 'mix';
+let mode: SoundMode = 'off';
+
+const SESSION_TYPE: Record<Exclude<SoundMode, 'off'>, string> = {
+  on: 'playback',
+  mix: 'ambient',
+};
 
 let ctx: AudioContext | null = null;
 /** Every note goes through this node, so it sets the overall volume. */
 let master: GainNode | null = null;
 /** Slider position, 0–1. 1 = the tones' designed loudness. */
 let volume = 0.8;
-/** Pending "release the speaker" timer. */
-let sleepTimer: ReturnType<typeof setTimeout> | undefined;
-/** Extra time after a tone's nominal length for its ring-out (temple bell rings ~6s). */
-const RING_OUT_SECONDS = 3.5;
 
 /**
  * Sliders feel more even when loudness follows a curve rather than a straight
@@ -149,55 +150,55 @@ export function setVolume(v: number): void {
   if (ctx && master) master.gain.setTargetAtTime(volumeToGain(volume), ctx.currentTime, 0.02);
 }
 
-/**
- * Turn tones on or off. Call it from the toggle's handler: turning sound on is
- * a user gesture, which iPhone needs before audio can start.
- */
-export function setSoundOn(on: boolean): void {
-  soundOn = on;
-  if (on) unlockAudio();
-  else scheduleSleep(0);
+function applySessionType(): void {
+  if (mode === 'off') return;
+  const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
+  if (session) session.type = SESSION_TYPE[mode];
 }
 
 /**
- * Browsers only allow audio after a user gesture, so this runs from click
- * handlers (Start, Listen, the Sound toggle). It does nothing while sound is
- * off, so the app never touches the audio session (or a podcast) then.
+ * Change the sound mode. Call it from the control's handler: choosing a mode
+ * with sound is a user gesture, which iPhone needs before audio can start.
+ */
+export function setSoundMode(next: SoundMode): void {
+  mode = next;
+  if (mode === 'off') {
+    // Stop using the speaker entirely.
+    if (ctx && ctx.state === 'running') void ctx.suspend();
+    return;
+  }
+  applySessionType();
+  unlockAudio();
+}
+
+/**
+ * Browsers only allow audio after a user gesture, so this runs from taps
+ * (Start, Listen, choosing a Sound mode). It does nothing while sound is off,
+ * so the app never touches the audio session (or a podcast) then.
  */
 export function unlockAudio(): AudioContext | null {
-  if (!soundOn) return null;
+  if (mode === 'off') return null;
   if (!ctx) {
-    const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
-    if (session) session.type = 'playback';
+    applySessionType();
     ctx = new AudioContext();
     master = ctx.createGain();
     master.gain.value = volumeToGain(volume);
     master.connect(ctx.destination);
   }
-  // Suspended by scheduleSleep, or 'interrupted' by iPhone after a call.
+  // Suspended by switching to Off, or 'interrupted' by iPhone after a call.
   if (ctx.state !== 'running') void ctx.resume();
   return ctx;
 }
 
-/** Suspend audio after `seconds` so iPhone can give the speaker back to a podcast. */
-function scheduleSleep(seconds: number): void {
-  clearTimeout(sleepTimer);
-  sleepTimer = setTimeout(() => {
-    if (ctx && ctx.state === 'running') void ctx.suspend();
-  }, seconds * 1000);
-}
-
 /** Play a tone `repeat` times back to back (used for the "workout done" signal). */
 export async function playTone(id: string, repeat = 1): Promise<void> {
-  if (!soundOn) return;
-  clearTimeout(sleepTimer);
   const audio = unlockAudio();
   if (!audio) return;
   if (audio.state !== 'running') {
     try {
       await audio.resume();
     } catch {
-      // Nothing more we can do; the next user tap will unlock it again.
+      // Nothing more we can do; the next tap will unlock it again.
     }
   }
   const tone = getTone(id);
@@ -205,5 +206,4 @@ export async function playTone(id: string, repeat = 1): Promise<void> {
   for (let i = 0; i < repeat; i++) {
     tone.play(audio, start + i * tone.length);
   }
-  scheduleSleep(repeat * tone.length + RING_OUT_SECONDS);
 }

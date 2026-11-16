@@ -6,7 +6,7 @@ import '@fontsource/jost/300.css';
 import '@fontsource/jost/400.css';
 import './style.css';
 import { buildSchedule, formatClock, positionAt, totalDurationMs, type Phase } from './timer';
-import { DEFAULT_TONE_ID, TONES, playTone, setSoundOn, setVolume, unlockAudio } from './tones';
+import { DEFAULT_TONE_ID, TONES, playTone, setSoundMode, setVolume, unlockAudio, type SoundMode } from './tones';
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
 
@@ -52,35 +52,49 @@ volumeInput.addEventListener('change', () => {
   if (volumeInput.valueAsNumber > 0) playTone(toneSelect.value);
 });
 
-// Sound toggle. Off (the default) = no tones, even with the phone's ringer on.
-// On = tones play even when the phone is on silent; on iPhone a playing podcast
-// pauses at each tone and may resume after (see tones.ts). Remembered per device.
-const soundInput = $<HTMLInputElement>('#sound-on');
+// Sound: Off (the default) / On / Over podcast. iPhone can't both play on
+// silent and mix with a podcast, so the user picks (see tones.ts).
+// Remembered per device.
+const soundInputs = [...form.querySelectorAll<HTMLInputElement>('input[name="sound"]')];
 const soundHint = $('#sound-hint');
 const previewBtn = $<HTMLButtonElement>('#preview-tone');
-const SOUND_KEY = 'emilys-timer.soundOn';
+const SOUND_KEY = 'emilys-timer.sound';
+const SOUND_HINTS: Record<SoundMode, string> = {
+  off: "Tones won't play",
+  on: 'Plays even on silent · pauses podcasts',
+  mix: 'Plays over podcasts · turn off silent mode',
+};
+
+function currentSoundMode(): SoundMode {
+  return (soundInputs.find((i) => i.checked)?.value ?? 'off') as SoundMode;
+}
 
 function applySound(): void {
-  setSoundOn(soundInput.checked);
-  soundHint.textContent = soundInput.checked
-    ? 'On · plays on silent · pauses podcasts'
-    : "Off · tones won't play";
+  const mode = currentSoundMode();
+  setSoundMode(mode);
+  soundHint.textContent = SOUND_HINTS[mode];
   // Nothing to preview or adjust while sound is off.
-  previewBtn.disabled = !soundInput.checked;
-  volumeInput.disabled = !soundInput.checked;
+  previewBtn.disabled = mode === 'off';
+  volumeInput.disabled = mode === 'off';
 }
 
 try {
-  soundInput.checked = localStorage.getItem(SOUND_KEY) === 'true';
+  // The older on/off toggle stored 'emilys-timer.soundOn'; carry "on" over.
+  const saved =
+    localStorage.getItem(SOUND_KEY) ?? (localStorage.getItem('emilys-timer.soundOn') === 'true' ? 'on' : null);
+  const match = soundInputs.find((i) => i.value === saved);
+  if (match) match.checked = true;
 } catch {}
 applySound();
 
-soundInput.addEventListener('change', () => {
-  applySound();
-  try {
-    localStorage.setItem(SOUND_KEY, String(soundInput.checked));
-  } catch {}
-});
+for (const input of soundInputs) {
+  input.addEventListener('change', () => {
+    applySound();
+    try {
+      localStorage.setItem(SOUND_KEY, currentSoundMode());
+    } catch {}
+  });
+}
 
 type RunState = 'idle' | 'running' | 'paused' | 'done';
 

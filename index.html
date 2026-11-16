@@ -52,13 +52,15 @@
           <span class="volume-head">Volume <output id="volume-value" for="volume">80%</output></span>
           <input id="volume" name="volume" type="range" min="0" max="100" step="1" value="80" />
         </label>
-        <label class="switch-row">
-          <span class="switch-text">
-            Sound
-            <span class="hint" id="sound-hint">Off · tones won't play</span>
-          </span>
-          <input id="sound-on" name="soundOn" type="checkbox" role="switch" />
-        </label>
+        <fieldset class="sound-row">
+          <legend>Sound</legend>
+          <div class="segmented" role="radiogroup" aria-label="Sound">
+            <label><input type="radio" name="sound" value="off" checked /><span>Off</span></label>
+            <label><input type="radio" name="sound" value="on" /><span>On</span></label>
+            <label><input type="radio" name="sound" value="mix" /><span>Over podcast</span></label>
+          </div>
+          <p class="hint" id="sound-hint">Tones won't play</p>
+        </fieldset>
       </form>
     </main>
     <script type="module" src="/src/main.ts"></script>
