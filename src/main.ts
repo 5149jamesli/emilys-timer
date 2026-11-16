@@ -6,7 +6,7 @@ import '@fontsource/jost/300.css';
 import '@fontsource/jost/400.css';
 import './style.css';
 import { buildSchedule, formatClock, positionAt, totalDurationMs, type Phase } from './timer';
-import { DEFAULT_TONE_ID, TONES, playTone, setVolume, unlockAudio } from './tones';
+import { DEFAULT_TONE_ID, TONES, playTone, setPlayOnSilent, setVolume, unlockAudio } from './tones';
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
 
@@ -50,6 +50,33 @@ volumeInput.addEventListener('change', () => {
     localStorage.setItem(VOLUME_KEY, volumeInput.value);
   } catch {}
   if (volumeInput.valueAsNumber > 0) playTone(toneSelect.value);
+});
+
+// "Play on silent" (iPhone): on = hear tones even in silent mode, but they stop
+// podcasts/music; off = tones mix over a podcast but the silent switch mutes
+// them. On by default, because hearing the timer matters most. Remembered per device.
+const silentInput = $<HTMLInputElement>('#play-on-silent');
+const silentHint = $('#silent-hint');
+const SILENT_KEY = 'emilys-timer.playOnSilent';
+
+function applyPlayOnSilent(): void {
+  setPlayOnSilent(silentInput.checked);
+  silentHint.textContent = silentInput.checked
+    ? 'Pauses podcasts & music'
+    : 'Plays over podcasts · muted when on silent';
+}
+
+try {
+  const saved = localStorage.getItem(SILENT_KEY);
+  if (saved !== null) silentInput.checked = saved === 'true';
+} catch {}
+applyPlayOnSilent();
+
+silentInput.addEventListener('change', () => {
+  applyPlayOnSilent();
+  try {
+    localStorage.setItem(SILENT_KEY, String(silentInput.checked));
+  } catch {}
 });
 
 type RunState = 'idle' | 'running' | 'paused' | 'done';
@@ -186,7 +213,8 @@ function syncControls(): void {
 startBtn.addEventListener('click', () => (state === 'running' ? pause() : start()));
 resetBtn.addEventListener('click', reset);
 form.addEventListener('input', (e) => {
-  if (state === 'idle' && e.target !== volumeInput) reset();
+  // Only the workout numbers affect the display; volume and switches don't.
+  if (state === 'idle' && e.target instanceof HTMLInputElement && e.target.type === 'number') reset();
 });
 
 reset();

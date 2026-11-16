@@ -112,14 +112,27 @@ export function getTone(id: string): Tone {
 }
 
 /**
- * How our sounds share the speaker with other apps (Audio Session API; Safari
- * 16.4+ on iPhone, ignored elsewhere). 'transient' is meant for short alerts
- * that play over other audio, like a podcast, which may be ducked briefly,
- * instead of stopping it. The trade-off on iPhone: these sounds probably follow
- * the ring/silent switch. 'playback' would ignore the silent switch but pauses
- * other apps' audio. Try 'ambient' if 'transient' misbehaves on a real phone.
+ * How our sounds share the speaker with other apps on iPhone (Audio Session
+ * API; Safari 16.4+, ignored by other browsers). iPhone forces a choice:
+ * - 'playback': plays even when the phone is on silent, but stops any podcast
+ *   or music that's playing.
+ * - 'transient': short alerts that mix over a podcast (ducking it briefly), but
+ *   the silent switch mutes them.
+ * The user picks with the "Play on silent" switch (setPlayOnSilent).
  */
-const AUDIO_SESSION_TYPE = 'transient';
+type AudioSessionType = 'playback' | 'transient';
+let sessionType: AudioSessionType = 'playback';
+
+function applySessionType(): void {
+  const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
+  if (session) session.type = sessionType;
+}
+
+/** true = hear tones even on silent (pauses podcasts); false = mix with podcasts. */
+export function setPlayOnSilent(on: boolean): void {
+  sessionType = on ? 'playback' : 'transient';
+  applySessionType();
+}
 
 let ctx: AudioContext | null = null;
 /** Every note goes through this node, so it sets the overall volume. */
@@ -147,8 +160,7 @@ export function setVolume(v: number): void {
  */
 export function unlockAudio(): AudioContext {
   if (!ctx) {
-    const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
-    if (session) session.type = AUDIO_SESSION_TYPE;
+    applySessionType();
     ctx = new AudioContext();
     master = ctx.createGain();
     master.gain.value = volumeToGain(volume);
