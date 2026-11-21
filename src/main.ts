@@ -5,6 +5,7 @@ import '@fontsource/cormorant-garamond/400-italic.css';
 import '@fontsource/jost/300.css';
 import '@fontsource/jost/400.css';
 import './style.css';
+import { SETUP_KEY, parseSavedSetup, serializeSetup } from './setup';
 import { buildSchedule, formatClock, positionAt, totalDurationMs, type Phase } from './timer';
 import { DEFAULT_TONE_ID, TONES, playTone, setSoundMode, setVolume, unlockAudio, type SoundMode } from './tones';
 
@@ -21,6 +22,20 @@ const resetBtn = $<HTMLButtonElement>('#reset');
 
 for (const tone of TONES) toneSelect.add(new Option(tone.label, tone.id));
 toneSelect.value = DEFAULT_TONE_ID;
+
+// Reopen with the last setup that was actually used (saved in start()).
+// Invalid or missing fields keep the defaults from index.html.
+const numberInput = (name: string) => form.elements.namedItem(name) as HTMLInputElement;
+try {
+  const saved = parseSavedSetup(
+    localStorage.getItem(SETUP_KEY),
+    TONES.map((t) => t.id),
+  );
+  if (saved.sets !== undefined) numberInput('sets').value = String(saved.sets);
+  if (saved.workSeconds !== undefined) numberInput('work').value = String(saved.workSeconds);
+  if (saved.restSeconds !== undefined) numberInput('rest').value = String(saved.restSeconds);
+  if (saved.tone !== undefined) toneSelect.value = saved.tone;
+} catch {}
 
 $('#preview-tone').addEventListener('click', () => playTone(toneSelect.value));
 
@@ -110,7 +125,7 @@ let wakeLock: WakeLockSentinel | null = null;
 
 function readConfig() {
   // Read inputs directly: FormData skips disabled inputs, and they're disabled mid-run.
-  const num = (name: string) => (form.elements.namedItem(name) as HTMLInputElement).valueAsNumber || 0;
+  const num = (name: string) => numberInput(name).valueAsNumber || 0;
   return {
     sets: num('sets'),
     workSeconds: num('work'),
@@ -168,7 +183,12 @@ function start(): void {
   if (!form.reportValidity()) return;
   unlockAudio();
   if (state === 'idle' || state === 'done') {
-    schedule = buildSchedule(readConfig());
+    const config = readConfig();
+    // A new workout (not a resume): remember this setup for next time.
+    try {
+      localStorage.setItem(SETUP_KEY, serializeSetup({ ...config, tone: toneSelect.value }));
+    } catch {}
+    schedule = buildSchedule(config);
     elapsedBeforeMs = 0;
     lastIndex = -1;
     playTone(toneSelect.value);
