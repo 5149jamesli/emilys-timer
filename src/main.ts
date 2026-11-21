@@ -256,6 +256,9 @@ form.addEventListener('input', (e) => {
 
 reset();
 
+// Which deploy this is, so it's easy to tell whether a phone has the update.
+$('#version').textContent = `v ${__APP_VERSION__}`;
+
 // Offline support: the service worker only exists in production builds.
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(() => {

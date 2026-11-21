@@ -68,6 +68,11 @@ The main way people use this is on iPhone via Safari → Share → **Add to Home
 - **Offline:** the service worker precaches the app shell, including only the Latin `.woff2` fonts.
   - Page loads are network-first, so a new deploy appears the next time the app is opened. Everything else is cache-first.
   - Cache lookups use `ignoreVary: true`. Without it, the cached JS/CSS didn't match offline.
+  - **Bypass the HTTP cache for the page.** GitHub Pages sends `Cache-Control: max-age=600`.
+    - Navigations use `fetch(request, { cache: 'no-cache' })`, and precaching uses `new Request(url, { cache: 'reload' })`.
+    - A plain `fetch()` served the previous deploy's `index.html` (and so the previous JS) for up to 10 minutes after a publish. On a real iPhone that made a freshly published feature look broken.
+    - Only `response.ok` pages are stored as the offline copy.
+- **Version label:** the bottom of the page shows `v <short commit>`. `__APP_VERSION__` is defined in `vite.config.ts` from `GITHUB_SHA` (declared in `src/env.d.ts`); local builds show `v dev`. Use it to check whether a phone has a deploy: compare with `git log --oneline -1`.
   - If you add a file the app needs offline, check that it ends up in the precache list.
 - **Sound (Off / On / Over podcast):** a three-way control under Volume. The user chose this after trying the alternatives on a real iPhone. It's saved as `emilys-timer.sound` in `localStorage`; an old `emilys-timer.soundOn = 'true'` carries over as On. **Off by default.** `setSoundMode()` in `tones.ts` sets `navigator.audioSession.type`:
   - **Off:** no tones at all, even with the ringer on. The app never touches the audio session, so a podcast is never interrupted. Listen and Volume are disabled.

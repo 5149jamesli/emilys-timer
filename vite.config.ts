@@ -54,6 +54,11 @@ export default defineConfig({
   // serves it at /<repo-name>/).
   base: './',
   plugins: [serviceWorker()],
+  define: {
+    // Shown at the bottom of the page so you can tell which deploy a phone is
+    // running. GitHub Actions sets GITHUB_SHA; local builds show "dev".
+    __APP_VERSION__: JSON.stringify(process.env.GITHUB_SHA?.slice(0, 7) ?? 'dev'),
+  },
   server: { port: port ?? 5173 },
   preview: { port: port ?? 4173 },
 });

@@ -368,3 +368,13 @@ input[type='range']::-moz-range-thumb {
 @media (prefers-reduced-motion: reduce) {
   *, *::before { animation: none !important; transition: none !important; }
 }
+
+/* ---- Version label: tiny and quiet, just for checking updates ---- */
+
+.version {
+  margin: 0;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  color: var(--ink-soft);
+  opacity: 0.6;
+}

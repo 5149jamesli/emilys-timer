@@ -8,13 +8,23 @@
 //   time the app opens; fall back to the cached page when offline.
 // - Everything else: cache first (built assets have hashed, immutable names),
 //   caching anything new as it's fetched.
+//
+// Bypass the browser's HTTP cache for the page. GitHub Pages sends
+// `Cache-Control: max-age=600`, so a plain fetch() can return the previous
+// deploy's index.html for up to 10 minutes. That page points at the previous
+// JS, so a fresh deploy looked like it hadn't arrived. `cache: 'no-cache'`
+// always revalidates with the server (a cheap 304 when nothing changed), and
+// precaching uses `cache: 'reload'` so it never stores a stale copy.
 
 const PRECACHE = __PRECACHE__;
 const CACHE = 'emilys-timer-' + __VERSION__;
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(PRECACHE)).then(() => self.skipWaiting()),
+    caches
+      .open(CACHE)
+      .then((cache) => cache.addAll(PRECACHE.map((url) => new Request(url, { cache: 'reload' }))))
+      .then(() => self.skipWaiting()),
   );
 });
 
@@ -33,10 +43,13 @@ self.addEventListener('fetch', (event) => {
 
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request)
+      fetch(request, { cache: 'no-cache' })
         .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE).then((cache) => cache.put('./', copy));
+          // Only keep real pages as the offline copy, never an error page.
+          if (response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE).then((cache) => cache.put('./', copy));
+          }
           return response;
         })
         .catch(() => caches.match('./', { ignoreVary: true })),
